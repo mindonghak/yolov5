@@ -36,11 +36,16 @@ from pathlib import Path
 
 import torch
 
+import flask
+
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+best_path = ROOT / 'runs/train/myyolov5_results/weights/best.pt'
 
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
@@ -52,12 +57,12 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 @smart_inference_mode()
 def run(
-        weights=ROOT / 'yolov5s.pt',  # model path or triton URL
+        weights=best_path,  # model path or triton URL
         source=ROOT / 'data/images',  # file/dir/URL/glob/screen/0(webcam)
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
-        iou_thres=0.45,  # NMS IOU threshold
+        iou_thres=0.7,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
@@ -214,11 +219,12 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
+    return save_path
 
 
-def parse_opt():
+def parse_opt():    #first detect arguments, 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path or triton URL')
+    parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path or triton URL') #using yolov5s.pt
     parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir/URL/glob/screen/0(webcam)')
     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='(optional) dataset.yaml path')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
@@ -231,7 +237,7 @@ def parse_opt():
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
     parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
     parser.add_argument('--nosave', action='store_true', help='do not save images/videos')
-    parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
+    parser.add_argument('--classes', default = 0, nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3') #detect people
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--visualize', action='store_true', help='visualize features')
@@ -253,9 +259,14 @@ def parse_opt():
 
 def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
+    new_path = run(**vars(opt))
+    result_path = run(source=new_path)
+    print(result_path)
 
+
+app = flask.Flask(__name__)
 
 if __name__ == '__main__':
+    app.run(host='0.0.0.0', port='5000')
     opt = parse_opt()
     main(opt)
